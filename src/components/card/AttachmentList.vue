@@ -94,10 +94,12 @@ import relativeDate from '../../mixins/relativeDate.js'
 import { formatFileSize } from '@nextcloud/files'
 import { getCurrentUser } from '@nextcloud/auth'
 import { generateUrl, generateOcsUrl, generateRemoteUrl } from '@nextcloud/router'
-import { mapState, mapActions } from 'vuex'
+import { mapState as mapStateVuex } from 'vuex'
+import { mapState, mapActions } from 'pinia'
 import { loadState } from '@nextcloud/initial-state'
 import attachmentUpload from '../../mixins/attachmentUpload.js'
 import { getFilePickerBuilder } from '@nextcloud/dialogs'
+import { useAttachmentStore } from '../../stores/attachment.js'
 const maxUploadSizeState = loadState('deck', 'maxUploadSize', -1)
 
 const picker = getFilePickerBuilder(t('deck', 'File to share'))
@@ -147,7 +149,7 @@ export default {
 		},
 		attachments() {
 			// FIXME sort propertly by last modified / deleted at
-			return [...this.$store.getters.attachmentsByCard(this.cardId)].filter(attachment => attachment.deletedAt >= 0).sort((a, b) => b.id - a.id)
+			return [...this.attachmentsByCard(this.cardId)].filter(attachment => attachment.deletedAt >= 0).sort((a, b) => b.id - a.id)
 		},
 		mimetypeForAttachment() {
 			return (attachment) => {
@@ -176,9 +178,12 @@ export default {
 		formattedFileSize() {
 			return (filesize) => formatFileSize(filesize)
 		},
-		...mapState({
+		...mapStateVuex({
 			currentBoard: state => state.currentBoard,
 		}),
+		...mapState(useAttachmentStore, [
+			'attachmentsByCard',
+		]),
 		isReadOnly() {
 			return !this.$store.getters.canEdit
 		},
@@ -197,6 +202,9 @@ export default {
 			return (attachment) => attachment?.extendedData?.info?.extension
 				?? (attachment?.name ?? attachment.data).split('.').pop()
 		},
+		cardDetailsInModal() {
+			return this.$store.getters.config('cardDetailsInModal')
+		},
 	},
 	watch: {
 		cardId: {
@@ -207,8 +215,9 @@ export default {
 		},
 	},
 	methods: {
-		...mapActions([
+		...mapActions(useAttachmentStore, [
 			'fetchAttachments',
+			'unshareAttachment',
 		]),
 		handleUploadFile(event) {
 			const files = event.target.files ?? []
@@ -237,15 +246,22 @@ export default {
 					})
 				})
 		},
-		unshareAttachment(attachment) {
-			this.$store.dispatch('unshareAttachment', attachment)
-		},
 		clickAddNewAttachmment() {
 			this.$refs.localAttachments.click()
 		},
 		showViewer(attachment) {
 			if (attachment.extendedData.fileid && window.OCA.Viewer.availableHandlers.map(handler => handler.mimes).flat().includes(attachment.extendedData.mimetype)) {
-				window.OCA.Viewer.open({ path: attachment.extendedData.path })
+				// Hide the sidebar if opening card in modal to avoid wrong sidebar position calculating in Viewer app
+				const sidebar = document.querySelector('aside.app-sidebar')
+				if (sidebar && this.cardDetailsInModal) {
+					sidebar.style.display = 'none'
+				}
+				const onClose = () => {
+					if (sidebar && sidebar.style.display === 'none') {
+						sidebar.style.display = ''
+					}
+				}
+				window.OCA.Viewer.open({ path: attachment.extendedData.path, onClose })
 				return
 			}
 

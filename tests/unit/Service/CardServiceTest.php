@@ -37,6 +37,7 @@ use OCA\Deck\Db\LabelMapper;
 use OCA\Deck\Db\Stack;
 use OCA\Deck\Db\StackMapper;
 use OCA\Deck\Model\CardDetails;
+use OCA\Deck\Model\OptionalNullableValue;
 use OCA\Deck\Notification\NotificationHelper;
 use OCA\Deck\StatusException;
 use OCA\Deck\Validators\CardServiceValidator;
@@ -207,6 +208,7 @@ class CardServiceTest extends TestCase {
 		$cardExpected->setRelatedBoard($boardMock);
 		$cardExpected->setRelatedStack($stackMock);
 		$cardExpected->setLabels([]);
+		$cardExpected->setDependentCards([]);
 		$expected = new CardDetails($cardExpected);
 
 		$actual = $this->cardService->find(123);
@@ -221,6 +223,7 @@ class CardServiceTest extends TestCase {
 			'order' => 999,
 			'type' => 'text',
 			'id' => 0,
+			'color' => '00ff00',
 		]);
 		$stack = Stack::fromParams([
 			'id' => 123,
@@ -233,13 +236,14 @@ class CardServiceTest extends TestCase {
 			->method('find')
 			->with(123)
 			->willReturn($stack);
-		$b = $this->cardService->create('Card title', 123, 'text', 999, 'admin');
+		$b = $this->cardService->create('Card title', 123, 'text', 999, 'admin', '', null, null, '00ff00');
 
 		$this->assertEquals($b->getTitle(), 'Card title');
 		$this->assertEquals($b->getOwner(), 'admin');
 		$this->assertEquals($b->getType(), 'text');
 		$this->assertEquals($b->getOrder(), 999);
 		$this->assertEquals($b->getStackId(), 123);
+		$this->assertEquals($b->getColor(), '00ff00');
 	}
 
 	public function testClone() {
@@ -350,6 +354,7 @@ class CardServiceTest extends TestCase {
 			'title' => 'Card title',
 			'archived' => 'false',
 			'stackId' => 234,
+			'color' => '00ff00',
 		]);
 		$stack = Stack::fromParams([
 			'id' => 234,
@@ -364,13 +369,112 @@ class CardServiceTest extends TestCase {
 			->method('find')
 			->with(234)
 			->willReturn($stack);
-		$actual = $this->cardService->update(123, 'newtitle', 234, 'text', 'admin', 'foo', 999, '2017-01-01 00:00:00', null);
+		$actual = $this->cardService->update(123, 'newtitle', 234, 'text', 'admin', 'foo', 999, '2017-01-01 00:00:00', null, null, null, null, new OptionalNullableValue('ffffff'));
 		$this->assertEquals('newtitle', $actual->getTitle());
 		$this->assertEquals(234, $actual->getStackId());
 		$this->assertEquals('text', $actual->getType());
 		$this->assertEquals(999, $actual->getOrder());
 		$this->assertEquals('foo', $actual->getDescription());
 		$this->assertEquals(new \DateTime('2017-01-01T00:00:00+00:00'), $actual->getDuedate());
+		$this->assertEquals('ffffff', $actual->getColor());
+	}
+
+	public function testUpdateKeepsColorWhenOmitted() {
+		$card = Card::fromParams([
+			'title' => 'Card title',
+			'archived' => 'false',
+			'stackId' => 234,
+			'color' => '00ff00',
+		]);
+		$card->setColor('ff0000');
+		$stack = Stack::fromParams([
+			'id' => 234,
+			'boardId' => 1337,
+		]);
+		$this->cardMapper->expects($this->once())->method('find')->willReturn($card);
+		$this->cardMapper->expects($this->once())->method('update')->willReturnCallback(function ($c) {
+			$c->setId(1);
+			return $c;
+		});
+		$this->stackMapper->expects($this->once())
+			->method('find')
+			->with(234)
+			->willReturn($stack);
+		$actual = $this->cardService->update(123, 'newtitle', 234, 'text', 'admin', 'foo', 999, '2017-01-01 00:00:00', null, null, null, null, null);
+		$this->assertSame('ff0000', $actual->getColor());
+	}
+
+	public function testUpdateClearsColorWhenNullProvided() {
+		$card = Card::fromParams([
+			'title' => 'Card title',
+			'archived' => 'false',
+			'stackId' => 234,
+			'color' => '00ff00',
+		]);
+		$card->setColor('ff0000');
+		$stack = Stack::fromParams([
+			'id' => 234,
+			'boardId' => 1337,
+		]);
+		$this->cardMapper->expects($this->once())->method('find')->willReturn($card);
+		$this->cardMapper->expects($this->once())->method('update')->willReturnCallback(function ($c) {
+			$c->setId(1);
+			return $c;
+		});
+		$this->stackMapper->expects($this->once())
+			->method('find')
+			->with(234)
+			->willReturn($stack);
+		$actual = $this->cardService->update(123, 'newtitle', 234, 'text', 'admin', 'foo', 999, '2017-01-01 00:00:00', null, null, null, null, new OptionalNullableValue(null));
+		$this->assertNull($actual->getColor());
+	}
+
+	public function testUpdateClearsColorWhenEmptyStringProvided() {
+		$card = Card::fromParams([
+			'title' => 'Card title',
+			'archived' => 'false',
+			'stackId' => 234,
+			'color' => '00ff00',
+		]);
+		$card->setColor('ff0000');
+		$stack = Stack::fromParams([
+			'id' => 234,
+			'boardId' => 1337,
+		]);
+		$this->cardMapper->expects($this->once())->method('find')->willReturn($card);
+		$this->cardMapper->expects($this->once())->method('update')->willReturnCallback(function ($c) {
+			$c->setId(1);
+			return $c;
+		});
+		$this->stackMapper->expects($this->once())
+			->method('find')
+			->with(234)
+			->willReturn($stack);
+		$actual = $this->cardService->update(123, 'newtitle', 234, 'text', 'admin', 'foo', 999, '2017-01-01 00:00:00', null, null, null, null, new OptionalNullableValue(''));
+		$this->assertNull($actual->getColor());
+	}
+
+	public function testUpdateSetsColor() {
+		$card = Card::fromParams([
+			'title' => 'Card title',
+			'archived' => 'false',
+			'stackId' => 234,
+		]);
+		$stack = Stack::fromParams([
+			'id' => 234,
+			'boardId' => 1337,
+		]);
+		$this->cardMapper->expects($this->once())->method('find')->willReturn($card);
+		$this->cardMapper->expects($this->once())->method('update')->willReturnCallback(function ($c) {
+			$c->setId(1);
+			return $c;
+		});
+		$this->stackMapper->expects($this->once())
+			->method('find')
+			->with(234)
+			->willReturn($stack);
+		$actual = $this->cardService->update(123, 'newtitle', 234, 'text', 'admin', 'foo', 999, '2017-01-01 00:00:00', null, null, null, null, new OptionalNullableValue('00ff00'));
+		$this->assertSame('00ff00', $actual->getColor());
 	}
 
 	public function testUpdateWithStartdate() {
@@ -628,5 +732,47 @@ class CardServiceTest extends TestCase {
 		$result = $this->cardService->done(42);
 		$this->assertNotNull($result->getDone());
 		$this->assertEquals(20, $result->getStackId());
+	}
+
+	public function testAssignDependentCard() {
+		$card = Card::fromParams([
+			'id' => 42,
+			'title' => 'Card title',
+			'stackId' => 234,
+		]);
+		$stack = Stack::fromParams([
+			'id' => 234,
+			'boardId' => 1337,
+		]);
+		$this->cardMapper->expects($this->once())->method('find')->willReturn($card);
+		$this->cardMapper->expects($this->once())->method('addDependency')->with(42, 43)->willReturn(true);
+		$this->cardMapper->expects($this->once())->method('findDependenciesForCards')->with([42])->willReturn([42 => [44, 43]]);
+		$this->stackMapper->expects($this->once())
+			->method('find')
+			->with(234)
+			->willReturn($stack);
+		$result = $this->cardService->assignDependentCard(42, 43);
+		$this->assertEquals([44, 43], $result->getDependentCards());
+	}
+
+	public function testRemoveDependentCard() {
+		$card = Card::fromParams([
+			'id' => 42,
+			'title' => 'Card title',
+			'stackId' => 234,
+		]);
+		$stack = Stack::fromParams([
+			'id' => 234,
+			'boardId' => 1337,
+		]);
+		$this->cardMapper->expects($this->once())->method('find')->willReturn($card);
+		$this->cardMapper->expects($this->once())->method('removeDependency')->with(42, 43)->willReturn(true);
+		$this->cardMapper->expects($this->once())->method('findDependenciesForCards')->with([42])->willReturn([42 => [44]]);
+		$this->stackMapper->expects($this->once())
+			->method('find')
+			->with(234)
+			->willReturn($stack);
+		$result = $this->cardService->removeDependentCard(42, 43);
+		$this->assertEquals([44], $result->getDependentCards());
 	}
 }

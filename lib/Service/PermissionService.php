@@ -93,7 +93,6 @@ class PermissionService {
 			return $permissions;
 		}
 
-
 		try {
 			$owner = $this->userIsBoardOwner($boardId, $userId, $allowDeleted);
 			$acls = $board->getDeletedAt() === 0 ? $this->aclMapper->findAll($boardId) : [];
@@ -203,7 +202,6 @@ class PermissionService {
 		return $this->boardCache[(string)$boardId];
 	}
 
-
 	public function externalUserCan(array $acls, int $permission, string $shareToken):bool {
 		$this->configService->ensureFederationEnabled();
 		foreach ($acls as $acl) {
@@ -305,7 +303,7 @@ class PermissionService {
 					continue;
 				}
 				foreach ($group->getUsers() as $user) {
-					$users[(string)$user->getUID()] = new User($user->getUID(), $this->userManager);
+					$users[$user->getUID()] = new User($user->getUID(), $this->userManager);
 				}
 			}
 

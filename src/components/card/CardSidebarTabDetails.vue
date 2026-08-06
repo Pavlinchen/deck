@@ -20,13 +20,16 @@
 
 		<StartDateSelector :card="card"
 			:can-edit="canEdit"
-			@change="updateCardStartDate"
 			@input="debouncedUpdateCardStartDate" />
 
 		<DueDateSelector :card="card"
 			:can-edit="canEdit"
-			@change="updateCardDue"
 			@input="debouncedUpdateCardDue" />
+
+		<DependentCardsSelector :card="card"
+			:can-edit="canEdit"
+			@select="assignDependentCard"
+			@remove="removeDependentCard" />
 
 		<div v-if="projectsEnabled" class="section-wrapper">
 			<NcCollectionList v-if="card.id"
@@ -59,10 +62,12 @@ import AssignmentSelector from './AssignmentSelector.vue'
 import DueDateSelector from './DueDateSelector.vue'
 import StartDateSelector from './StartDateSelector.vue'
 import { debounce } from 'lodash'
+import DependentCardsSelector from './DependentCardsSelector.vue'
 
 export default {
 	name: 'CardSidebarTabDetails',
 	components: {
+		DependentCardsSelector,
 		DueDateSelector,
 		StartDateSelector,
 		AssignmentSelector,
@@ -156,7 +161,7 @@ export default {
 
 		debouncedUpdateCardDue: debounce(function(val) {
 			this.updateCardDue(val)
-		}, 500),
+		}, 500, { leading: true }),
 
 		updateCardStartDate(val) {
 			this.$store.dispatch('updateCardStartDate', {
@@ -167,7 +172,7 @@ export default {
 
 		debouncedUpdateCardStartDate: debounce(function(val) {
 			this.updateCardStartDate(val)
-		}, 500),
+		}, 500, { leading: true }),
 
 		addLabelToCard(newLabel) {
 			this.copiedCard.labels.push(newLabel)
@@ -202,6 +207,39 @@ export default {
 				labelId: removedLabel.id,
 			}
 			this.$store.dispatch('removeLabel', data)
+		},
+		assignDependentCard(dependentCard) {
+			if (!dependentCard?.id) {
+				return
+			}
+
+			if (!Array.isArray(this.copiedCard.dependentCards)) {
+				this.copiedCard.dependentCards = []
+			}
+
+			if (!this.copiedCard.dependentCards.includes(dependentCard.id)) {
+				this.copiedCard.dependentCards.push(dependentCard.id)
+			}
+
+			this.$store.dispatch('assignDependentCard', {
+				card: this.copiedCard,
+				dependentCard,
+			})
+		},
+		removeDependentCard(dependentCard) {
+			const dependentCardId = dependentCard?.id
+			if (!dependentCardId) {
+				return
+			}
+
+			if (Array.isArray(this.copiedCard.dependentCards)) {
+				this.copiedCard.dependentCards = this.copiedCard.dependentCards.filter((id) => id !== dependentCardId)
+			}
+
+			this.$store.dispatch('removeDependentCard', {
+				card: this.copiedCard,
+				dependentCardId,
+			})
 		},
 		stringify(date) {
 			return moment(date).locale(this.locale).format('LLL')

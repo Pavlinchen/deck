@@ -8,6 +8,7 @@
 namespace OCA\Deck\Controller;
 
 use OCA\Deck\Model\OptionalNullableValue;
+use OCA\Deck\NotImplementedException;
 use OCA\Deck\Service\AssignmentService;
 use OCA\Deck\Service\BoardService;
 use OCA\Deck\Service\CardService;
@@ -35,7 +36,7 @@ class CardOcsController extends OCSController {
 
 	#[NoAdminRequired]
 	#[PublicPage]
-	public function create(string $title, int $stackId, ?int $boardId = null, ?string $type = 'plain', ?string $owner = null, ?int $order = 999, ?string $description = '', $duedate = null, $startdate = null, ?array $labels = [], ?array $users = []) {
+	public function create(string $title, int $stackId, ?int $boardId = null, ?string $type = 'plain', ?string $owner = null, ?int $order = 999, ?string $description = '', $duedate = null, $startdate = null, ?array $labels = [], ?array $users = [], ?string $color = null) {
 		if ($boardId) {
 			$board = $this->boardService->find($boardId, false);
 			if ($board->getExternalId()) {
@@ -47,7 +48,7 @@ class CardOcsController extends OCSController {
 		if (!$owner) {
 			$owner = $this->userId;
 		}
-		$card = $this->cardService->create($title, $stackId, $type, $order, $owner, $description, $duedate, $startdate);
+		$card = $this->cardService->create($title, $stackId, $type, $order, $owner, $description, $duedate, $startdate, $color);
 
 		// foreach ($labels as $label) {
 		// 	$this->assignLabel($card->getId(), $label);
@@ -59,7 +60,6 @@ class CardOcsController extends OCSController {
 
 		return new DataResponse($card);
 	}
-
 
 	#[NoAdminRequired]
 	#[PublicPage]
@@ -117,6 +117,9 @@ class CardOcsController extends OCSController {
 		$done = array_key_exists('done', $this->request->getParams())
 			? new OptionalNullableValue($this->request->getParam('done', null))
 			: null;
+		$color = array_key_exists('color', $this->request->getParams())
+			? new OptionalNullableValue($this->request->getParam('color', null))
+			: null;
 		if (!$owner) {
 			$owner = $this->userId;
 		} else {
@@ -154,7 +157,8 @@ class CardOcsController extends OCSController {
 			$deletedAt,
 			$archived,
 			$done,
-			$startdate
+			$startdate,
+			$color
 		));
 	}
 
@@ -168,5 +172,29 @@ class CardOcsController extends OCSController {
 			}
 		}
 		return new DataResponse($this->cardService->reorder($cardId, $stackId, $order));
+	}
+
+	#[NoAdminRequired]
+	#[PublicPage]
+	public function assignDependentCard(int $cardId, int $dependentCardId, ?int $boardId = null): DataResponse {
+		if ($boardId) {
+			$board = $this->boardService->find($boardId, false);
+			if ($board->getExternalId()) {
+				throw new NotImplementedException('Dependent cards are not supported for external boards');
+			}
+		}
+		return new DataResponse($this->cardService->assignDependentCard($cardId, $dependentCardId));
+	}
+
+	#[NoAdminRequired]
+	#[PublicPage]
+	public function removeDependentCard(int $cardId, int $dependentCardId, ?int $boardId = null): DataResponse {
+		if ($boardId) {
+			$board = $this->boardService->find($boardId, false);
+			if ($board->getExternalId()) {
+				throw new NotImplementedException('Dependent cards are not supported for external boards');
+			}
+		}
+		return new DataResponse($this->cardService->removeDependentCard($cardId, $dependentCardId));
 	}
 }

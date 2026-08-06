@@ -11,12 +11,8 @@ import Vuex from 'vuex'
 import axios from '@nextcloud/axios'
 import { generateOcsUrl, generateUrl } from '@nextcloud/router'
 import { BoardApi } from '../services/BoardApi.js'
-import stackModuleFactory from './stack.js'
 import cardModuleFactory from './card.js'
-import comment from './comment.js'
-import trashbin from './trashbin.js'
-import attachment from './attachment.js'
-import overview from './overview.js'
+import { useStackStore } from '../stores/stack.js'
 Vue.use(Vuex)
 
 const apiClient = new BoardApi()
@@ -34,12 +30,7 @@ export const BOARD_FILTERS = {
 export default function storeFactory() {
 	return new Vuex.Store({
 		modules: {
-			stack: stackModuleFactory(),
 			card: cardModuleFactory(),
-			comment,
-			trashbin,
-			attachment,
-			overview,
 		},
 		strict: debug,
 		state: {
@@ -61,7 +52,10 @@ export default function storeFactory() {
 			activity: [],
 			activityLoadMore: true,
 			filter: { tags: [], users: [], due: '', unassigned: false, completed: 'both' },
+			swimlaneLabelOrder: {},
+			swimlaneUserOrder: {},
 			shortcutLock: false,
+			viewModeByBoard: {},
 		},
 		getters: {
 			config: state => (key) => {
@@ -73,6 +67,15 @@ export default function storeFactory() {
 			},
 			getSearchQuery: state => {
 				return state.searchQuery
+			},
+			viewMode: state => {
+				if (!state.currentBoard) return 'kanban'
+				if (state.viewModeByBoard[state.currentBoard.id] !== undefined) {
+					return state.viewModeByBoard[state.currentBoard.id]
+				}
+
+				const stored = localStorage.getItem(`deck.viewMode.${state.currentBoard.id}`)
+				return stored !== null ? stored : 'kanban'
 			},
 			getFilter: state => {
 				return state.filter
@@ -299,8 +302,22 @@ export default function storeFactory() {
 					Vue.delete(state.currentBoard.acl, removeIndex)
 				}
 			},
+			SET_SWIMLANE_MODE(state, { mode }) {
+				if (state.currentBoard?.settings) {
+					Vue.set(state.currentBoard.settings, 'swimlaneMode', mode)
+				}
+			},
+			SET_SWIMLANE_ORDER(state, { boardId, type, order }) {
+				const key = type === 'labels' ? 'swimlaneLabelOrder' : 'swimlaneUserOrder'
+				Vue.set(state[key], boardId, order)
+			},
 			TOGGLE_SHORTCUT_LOCK(state, lock) {
 				state.shortcutLock = lock
+			},
+			setViewMode(state, mode) {
+				if (!state.currentBoard) return
+				Vue.set(state.viewModeByBoard, state.currentBoard.id, mode)
+				localStorage.setItem(`deck.viewMode.${state.currentBoard.id}`, mode)
 			},
 		},
 		actions: {
@@ -333,6 +350,20 @@ export default function storeFactory() {
 				const board = await apiClient.loadById(boardId)
 				commit('setCurrentBoard', board)
 				commit('setAssignableUsers', board.users)
+				if (board.settings) {
+					try {
+						const labelOrder = JSON.parse(board.settings.swimlaneLabelOrder || '[]')
+						if (labelOrder.length > 0) {
+							commit('SET_SWIMLANE_ORDER', { boardId, type: 'labels', order: labelOrder })
+						}
+					} catch (e) { /* ignore parse errors */ }
+					try {
+						const userOrder = JSON.parse(board.settings.swimlaneUserOrder || '[]')
+						if (userOrder.length > 0) {
+							commit('SET_SWIMLANE_ORDER', { boardId, type: 'assignees', order: userOrder })
+						}
+					} catch (e) { /* ignore parse errors */ }
+				}
 			},
 
 			async refreshBoard({ commit, dispatch }, boardId) {
@@ -342,7 +373,7 @@ export default function storeFactory() {
 				commit('setAssignableUsers', board.users)
 
 				if (etagHasChanged) {
-					dispatch('loadStacks', boardId)
+					useStackStore().loadStacks(boardId)
 				}
 			},
 
@@ -529,8 +560,38 @@ export default function storeFactory() {
 					newOwner,
 				})
 			},
+			async setSwimlaneMode({ commit, dispatch, state }, { boardId, mode }) {
+				// Optimistic update with rollback so the UI does not stay out of
+				// sync with the server when the config write is rejected (403,
+				// validation 400, network error).
+				const previous = state.currentBoard?.settings?.swimlaneMode || 'none'
+				commit('SET_SWIMLANE_MODE', { mode })
+				try {
+					await dispatch('setConfig', { [`board:${boardId}:swimlaneMode`]: mode })
+				} catch (e) {
+					commit('SET_SWIMLANE_MODE', { mode: previous })
+					throw e
+				}
+			},
+			async setSwimlaneOrder({ commit, dispatch, state }, { boardId, type, order }) {
+				const configKey = type === 'labels' ? 'swimlaneLabelOrder' : 'swimlaneUserOrder'
+				const stateKey = type === 'labels' ? 'swimlaneLabelOrder' : 'swimlaneUserOrder'
+				const previous = state[stateKey][boardId] ? [...state[stateKey][boardId]] : null
+				commit('SET_SWIMLANE_ORDER', { boardId, type, order })
+				try {
+					await dispatch('setConfig', { [`board:${boardId}:${configKey}`]: JSON.stringify(order) })
+				} catch (e) {
+					if (previous) {
+						commit('SET_SWIMLANE_ORDER', { boardId, type, order: previous })
+					}
+					throw e
+				}
+			},
 			toggleShortcutLock({ commit }, lock) {
 				commit('TOGGLE_SHORTCUT_LOCK', lock)
+			},
+			setViewMode({ commit }, mode) {
+				commit('setViewMode', mode)
 			},
 		},
 	})

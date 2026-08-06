@@ -5,7 +5,8 @@
 
 <template>
 	<div class="stack" :class="{'stack--done-column': isDoneColumn}" :data-cy-stack="stack.title">
-		<div v-click-outside="stopCardCreation"
+		<div v-if="!hideHeader"
+			v-click-outside="stopCardCreation"
 			class="stack__header"
 			:class="{'stack__header--add': showAddCard, 'stack__header--done-column': isDoneColumn}"
 			:aria-label="stack.title">
@@ -15,6 +16,7 @@
 					<CheckCircleOutline v-if="isDoneColumn"
 						class="stack__done-icon"
 						decorative />
+					<span class="stack__card-count">{{ cardsByStack.length }}</span>
 				</h3>
 				<h3 v-else-if="!editing"
 					tabindex="0"
@@ -27,6 +29,7 @@
 					<CheckCircleOutline v-if="isDoneColumn"
 						class="stack__done-icon"
 						decorative />
+					<span class="stack__card-count">{{ cardsByStack.length }}</span>
 				</h3>
 				<form v-else-if="editing"
 					v-click-outside="cancelEdit"
@@ -63,7 +66,7 @@
 					</template>
 					{{ isDoneColumn ? t('deck', 'Do not set cards as "done"') : t('deck', 'Set cards as "done"') }}
 				</NcActionButton>
-				<NcActionButton icon="icon-delete" @click="deleteStack(stack)">
+				<NcActionButton icon="icon-delete" @click="deleteStackShowUndo(stack)">
 					{{ t('deck', 'Delete list') }}
 				</NcActionButton>
 			</NcActions>
@@ -99,9 +102,10 @@
 			</div>
 		</NcModal>
 
-		<Container :get-child-payload="payloadForCard(stack.id)"
+		<Container v-if="!headerOnly"
+			:get-child-payload="payloadForCard(stack.id)"
 			class="dnd-container"
-			group-name="stack"
+			:group-name="lane ? 'stack-' + lane.key : 'stack'"
 			data-click-closes-sidebar="true"
 			non-drag-area-selector=".dragDisabled"
 			:drag-handle-selector="dragHandleSelector"
@@ -158,6 +162,9 @@ import { showError, showUndo } from '@nextcloud/dialogs'
 import CardItem from '../cards/CardItem.vue'
 
 import '@nextcloud/dialogs/style.css'
+import { mapActions } from 'pinia'
+import { useTrashbinStore } from '../../stores/trashbin.js'
+import { useStackStore } from '../../stores/stack.js'
 
 export default {
 	name: 'Stack',
@@ -183,6 +190,21 @@ export default {
 		stack: {
 			type: Object,
 			default: undefined,
+		},
+		lane: {
+			type: Object,
+			default: null,
+		},
+		// Swimlane view: render only the header row (title, actions, add card)
+		headerOnly: {
+			type: Boolean,
+			default: false,
+		},
+		// Swimlane view: render only the card column, header lives in the
+		// shared sticky header row at the top of the board
+		hideHeader: {
+			type: Boolean,
+			default: false,
 		},
 	},
 	data() {
@@ -211,6 +233,14 @@ export default {
 			showArchived: state => state.showArchived,
 		}),
 		cardsByStack() {
+			if (this.lane && this.lane.id !== undefined) {
+				return this.$store.getters.cardsByStackAndLane(this.stack.id, this.lane.type, this.lane.id).filter((card) => {
+					if (this.showArchived) {
+						return card.archived
+					}
+					return !card.archived
+				})
+			}
 			return this.$store.getters.cardsByStack(this.stack.id).filter((card) => {
 				if (this.showArchived) {
 					return card.archived
@@ -250,6 +280,8 @@ export default {
 	},
 
 	methods: {
+		...mapActions(useTrashbinStore, ['stackUndoDelete']),
+		...mapActions(useStackStore, ['setDoneStack', 'deleteStack', 'updateStack']),
 		stopCardCreation(e) {
 			// For some reason the submit event triggers a MouseEvent that is bubbling to the outside
 			// so we have to ignore it
@@ -284,15 +316,15 @@ export default {
 			}
 		},
 		toggleDoneColumn() {
-			this.$store.dispatch('setDoneStack', {
+			this.setDoneStack({
 				stackId: this.stack.id,
 				boardId: this.stack.boardId,
 				isDone: !this.isDoneColumn,
 			})
 		},
-		deleteStack(stack) {
-			this.$store.dispatch('deleteStack', stack)
-			showUndo(t('deck', 'List deleted'), () => this.$store.dispatch('stackUndoDelete', stack))
+		deleteStackShowUndo(stack) {
+			this.deleteStack(stack)
+			showUndo(t('deck', 'List deleted'), () => this.stackUndoDelete(stack))
 		},
 		setArchivedToAllCardsFromStack(stack, isArchived) {
 
@@ -313,7 +345,7 @@ export default {
 		},
 		finishedEdit(stack) {
 			if (this.copiedStack.title !== stack.title) {
-				this.$store.dispatch('updateStack', this.copiedStack)
+				this.updateStack(this.copiedStack)
 			}
 			this.editing = false
 		},
@@ -473,6 +505,18 @@ export default {
 				width: 1em;
 				height: 1em;
 			}
+		}
+
+		.stack__card-count {
+			flex-shrink: 0;
+			margin-inline-start: 6px;
+			padding: 0 8px;
+			border-radius: var(--border-radius-pill, 16px);
+			background-color: var(--color-background-darker);
+			color: var(--color-text-maxcontrast);
+			font-size: var(--default-font-size);
+			font-weight: normal;
+			line-height: 1.5;
 		}
 
 		form {

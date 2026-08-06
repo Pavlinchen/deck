@@ -1,7 +1,9 @@
 OC.L10N.register(
     "deck",
     {
+    "The file was uploaded" : "D'Datei gouf eropgelueden",
     "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form" : "Déi ropgelueden Datei ass méi grouss wei d'MAX_FILE_SIZE Eegenschaft déi an der HTML form uginn ass",
+    "The file was only partially uploaded" : "D'Datei gouf nëmmen deelweis eropgelueden",
     "No file was uploaded" : "Et ass kee Fichier ropgeluede ginn",
     "Missing a temporary folder" : "Et feelt en temporären Dossier",
     "In Progress" : "A Beaarbechtung",
@@ -14,6 +16,7 @@ OC.L10N.register(
     "Sharing" : "Gedeelt",
     "Tags" : "Tags",
     "Activity" : "Aktivitéit",
+    "Hours" : "Stonnen",
     "Can edit" : "Can edit",
     "Can share" : "Can share",
     "Owner" : "Owner",
@@ -25,7 +28,6 @@ OC.L10N.register(
     "Reply" : "Äntwerten",
     "Update" : "Update",
     "Description" : "Beschreiwung",
-    "seconds ago" : "Sekonnen hier",
     "Shared with you" : "Mat dir gedeelt",
     "Advanced options" : "Erweidert Astellungen",
     "Export" : "Exportéieren",
@@ -33,6 +35,7 @@ OC.L10N.register(
     "Modified" : "Geännert",
     "Share" : "Deelen",
     "Save" : "Späicheren",
+    "seconds ago" : "Sekonnen hier",
     "Today" : "Haut",
     "Tomorrow" : "Muer"
 },

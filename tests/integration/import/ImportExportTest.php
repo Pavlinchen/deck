@@ -61,7 +61,6 @@ class ImportExportTest extends \Test\TestCase {
 		parent::setUpBeforeClass();
 
 		$backend = new \Test\Util\User\Dummy();
-		\OC_User::useBackend($backend);
 		Server::get(IUserManager::class)->registerBackend($backend);
 		$backend->createUser('alice', 'alice');
 		$backend->createUser('jane', 'jane');
@@ -135,7 +134,7 @@ class ImportExportTest extends \Test\TestCase {
 		);
 	}
 
-	public static function writeArrayStructure(string $prefix = '', array $array = [], array $skipKeyList = ['id', 'boardId', 'cardId', 'stackId', 'ETag', 'permissions', 'shared', 'version', 'done', 'referenceData', 'token']): string {
+	public static function writeArrayStructure(string $prefix = '', array $array = [], array $skipKeyList = ['id', 'boardId', 'cardId', 'stackId', 'ETag', 'permissions', 'shared', 'version', 'done', 'referenceData', 'token', 'createdAt', 'lastModifiedAt']): string {
 		$output = '';
 		$arrayIsList = array_keys($array) === range(0, count($array) - 1);
 		foreach ($array as $key => $value) {
@@ -297,7 +296,6 @@ class ImportExportTest extends \Test\TestCase {
 			'title' => 'L2',
 			'color' => '31CC7C',
 		]), $fullBoard->getLabels(), true);
-
 
 		$stacks = $stackMapper->findAll($board->getId());
 		self::assertCount(3, $stacks);

@@ -16,6 +16,7 @@ OC.L10N.register(
     "General" : "Ընդհանուր",
     "Search" : "Search",
     "Activity" : "Գործունեություն",
+    "Hours" : "Ժամ",
     "Can edit" : "Can edit",
     "Can share" : "Can share",
     "Owner" : "Owner",
@@ -26,13 +27,13 @@ OC.L10N.register(
     "Created:" : "Ստեղծված.",
     "Update" : "Թարմացնել",
     "Description" : "Նկարագրություն",
-    "seconds ago" : "վրկ. առաջ",
     "Shared with you" : "Shared with you",
     "Export" : "Արտահանում",
     "Close" : "Փակել",
     "Modified" : "Փոփոխված",
     "Share" : "Կիսվել",
     "Save" : "Պահպանել",
+    "seconds ago" : "վրկ. առաջ",
     "Today" : "այսօր"
 },
 "nplurals=2; plural=(n != 1);");

@@ -226,6 +226,21 @@
 
 				<NcActions :aria-label="t('deck', 'View Modes')"
 					:name="t('deck', 'Toggle View Modes')">
+					<NcActionButton :model-value="viewMode === 'kanban'"
+						@click="setViewMode('kanban')">
+						<template #icon>
+							<ViewColumnIcon :size="20" decorative />
+						</template>
+						{{ t('deck', 'Kanban view') }}
+					</NcActionButton>
+					<NcActionButton :model-value="viewMode === 'gantt'"
+						@click="setViewMode('gantt')">
+						<template #icon>
+							<ChartGanttIcon :size="20" decorative />
+						</template>
+						{{ t('deck', 'Gantt view') }}
+					</NcActionButton>
+					<NcActionSeparator />
 					<NcActionButton @click="toggleShowArchived">
 						<template #icon>
 							<ArchiveIcon :size="20" decorative />
@@ -248,6 +263,31 @@
 						</template>
 						{{ showCardCover ? t('deck', 'Hide card cover images') : t('deck', 'Show card cover images') }}
 					</NcActionButton>
+					<template v-if="viewMode === 'kanban'">
+						<NcActionSeparator />
+						<NcActionCaption :name="t('deck', 'Group by')" />
+						<NcActionRadio name="swimlaneMode"
+							value="none"
+							:model-value="swimlaneMode"
+							:disabled="!canEdit"
+							@update:model-value="setSwimlaneMode">
+							{{ t('deck', 'No grouping') }}
+						</NcActionRadio>
+						<NcActionRadio name="swimlaneMode"
+							value="labels"
+							:model-value="swimlaneMode"
+							:disabled="!canEdit"
+							@update:model-value="setSwimlaneMode">
+							{{ t('deck', 'Labels') }}
+						</NcActionRadio>
+						<NcActionRadio name="swimlaneMode"
+							value="assignees"
+							:model-value="swimlaneMode"
+							:disabled="!canEdit"
+							@update:model-value="setSwimlaneMode">
+							{{ t('deck', 'Assignees') }}
+						</NcActionRadio>
+					</template>
 				</NcActions>
 				<!-- FIXME: NcActionRouter currently doesn't work as an inline action -->
 				<NcActions v-if="isFullApp">
@@ -264,7 +304,7 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import { subscribe, unsubscribe } from '@nextcloud/event-bus'
-import { NcActions, NcActionButton, NcAvatar, NcButton, NcPopover, NcModal } from '@nextcloud/vue'
+import { NcActions, NcActionButton, NcActionCaption, NcActionRadio, NcActionSeparator, NcAvatar, NcButton, NcPopover, NcModal } from '@nextcloud/vue'
 import labelStyle from '../mixins/labelStyle.js'
 import ArchiveIcon from 'vue-material-design-icons/ArchiveOutline.vue'
 import ImageIcon from 'vue-material-design-icons/ImageMultipleOutline.vue'
@@ -273,10 +313,14 @@ import FilterOffIcon from 'vue-material-design-icons/FilterOffOutline.vue'
 import TableColumnPlusAfter from 'vue-material-design-icons/TableColumnPlusAfter.vue'
 import ArrowCollapseVerticalIcon from 'vue-material-design-icons/ArrowCollapseVertical.vue'
 import ArrowExpandVerticalIcon from 'vue-material-design-icons/ArrowExpandVertical.vue'
+import ViewColumnIcon from 'vue-material-design-icons/ViewColumn.vue'
+import ChartGanttIcon from 'vue-material-design-icons/ChartGantt.vue'
 import SessionList from './SessionList.vue'
 import { isNotifyPushEnabled } from '../sessions.js'
 import CreateNewCardCustomPicker from '../views/CreateNewCardCustomPicker.vue'
 import { getCurrentUser } from '@nextcloud/auth'
+import { mapActions } from 'pinia'
+import { useStackStore } from '../stores/stack.js'
 
 export default {
 	name: 'Controls',
@@ -285,6 +329,9 @@ export default {
 		NcModal,
 		NcActions,
 		NcActionButton,
+		NcActionCaption,
+		NcActionRadio,
+		NcActionSeparator,
 		NcButton,
 		NcPopover,
 		NcAvatar,
@@ -294,6 +341,8 @@ export default {
 		FilterOffIcon,
 		ArrowCollapseVerticalIcon,
 		ArrowExpandVerticalIcon,
+		ViewColumnIcon,
+		ChartGanttIcon,
 		TableColumnPlusAfter,
 		SessionList,
 	},
@@ -327,6 +376,7 @@ export default {
 		...mapGetters([
 			'canEdit',
 			'canManage',
+			'viewMode',
 		]),
 		...mapState({
 			isFullApp: state => state.isFullApp,
@@ -345,6 +395,9 @@ export default {
 		},
 		labelsSorted() {
 			return [...this.board.labels].sort((a, b) => (a.title < b.title) ? -1 : 1)
+		},
+		swimlaneMode() {
+			return this.board?.settings?.swimlaneMode || 'none'
 		},
 		presentUsers() {
 			if (!this.board) return []
@@ -377,6 +430,7 @@ export default {
 		this.setPageTitle('')
 	},
 	methods: {
+		...mapActions(useStackStore, ['createStack']),
 		beforeSetFilter(e) {
 			if (this.filter.due === e.target.value) {
 				this.filter.due = ''
@@ -406,12 +460,20 @@ export default {
 		toggleShowCardCover() {
 			this.$store.dispatch('toggleShowCardCover')
 		},
+		setViewMode(mode) {
+			this.$store.dispatch('setViewMode', mode)
+		},
 		toggleShowArchived() {
 			this.$store.dispatch('toggleShowArchived')
 		},
+		setSwimlaneMode(mode) {
+			if (this.board?.id && this.canEdit) {
+				this.$store.dispatch('setSwimlaneMode', { boardId: this.board.id, mode })
+			}
+		},
 		addNewStack() {
 			this.stack = { title: this.newStackTitle }
-			this.$store.dispatch('createStack', this.stack)
+			this.createStack(this.stack)
 			this.newStackTitle = ''
 			this.stack = null
 			this.isAddStackVisible = false

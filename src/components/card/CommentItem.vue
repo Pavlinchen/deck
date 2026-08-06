@@ -84,6 +84,7 @@ import md5 from 'blueimp-md5'
 import relativeDate from '../../mixins/relativeDate.js'
 import ReplyIcon from 'vue-material-design-icons/ReplyOutline.vue'
 import moment from 'moment'
+import { useCommentStore } from '../../stores/comment.js'
 
 const AtMention = {
 	name: 'AtMention',
@@ -123,6 +124,10 @@ export default {
 			type: Boolean,
 			default: false,
 		},
+	},
+	setup() {
+		const commentStore = useCommentStore()
+		return { commentStore }
 	},
 	data() {
 		return {
@@ -179,13 +184,11 @@ export default {
 
 	methods: {
 		replyTo() {
-			this.$store.dispatch('setReplyTo', this.comment)
+			this.commentStore.setReplyTo(this.comment)
 		},
 		showUpdateForm() {
 			this.edit = true
-			this.$nextTick(() => {
-				this.commentMsg = this.$refs.richTextElement.children[0].innerHTML
-			})
+			this.commentMsg = this.comment.message
 		},
 		hideUpdateForm() {
 			this.commentMsg = ''
@@ -193,11 +196,10 @@ export default {
 		},
 		async updateComment() {
 			const data = {
-				comment: this.commentMsg,
+				comment: { id: this.comment.id, message: this.commentMsg },
 				cardId: this.comment.objectId,
-				id: this.comment.id,
 			}
-			await this.$store.dispatch('updateComment', data)
+			await this.commentStore.updateComment(data)
 			this.hideUpdateForm()
 		},
 		deleteComment() {
@@ -205,7 +207,7 @@ export default {
 				id: this.comment.id,
 				cardId: this.comment.objectId,
 			}
-			this.$store.dispatch('deleteComment', data)
+			this.commentStore.deleteComment(data)
 		},
 	},
 }
